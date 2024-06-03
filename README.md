@@ -9,15 +9,16 @@
 
 ## Overview
 
-**Smarty Studio - Auto Approve Product Reviews for WooCommerce** is a plugin that allows you to automatically approve product reviews in your WooCommerce store based on a minimum rating threshold that you can set in the settings.
+**Smarty Studio - Auto Approve Product Reviews for WooCommerce** is a plugin that allows you to automatically approve product reviews in your WooCommerce store based on minimum ratings you can set in the settings.
 
 ## Features
 
-- Automatically approve product reviews based on a minimum rating.
+- Automatically approve product reviews based on multiple minimum ratings.
+- Automatically approve existing pending reviews based on selected ratings.
 - Easy to configure through WooCommerce settings.
 - Option to disable auto-approval.
 - Supports WooCommerce's built-in review system.
-- Translation ready.
+- Translation ready
 
 ## Installation
 
@@ -43,8 +44,10 @@
 - `smarty_auto_approve_reviews_settings`: Adds settings for auto-approving reviews.
 - `smarty_auto_approve_reviews_check`: Checks and approves reviews based on rating.
 - `smarty_auto_approve_reviews_action_links`: Adds a settings link in the plugin list.
-- `smarty_auto_approve_reviews_on_activation`: Sets default options on plugin activation.
+- `smarty_auto_approve_reviews_on_activation`: Sets default options on plugin activation and schedules the review approval task.
+- `smarty_auto_approve_reviews_on_deactivation`: Clears the scheduled review approval task on deactivation.
 - `smarty_auto_approve_reviews_init`: Loads the text domain for translations.
+- `smarty_auto_approve_pending_reviews`: Approves pending reviews based on the selected ratings.
 
 ## Requirements
 

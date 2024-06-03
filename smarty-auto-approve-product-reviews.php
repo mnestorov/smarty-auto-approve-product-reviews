@@ -97,9 +97,25 @@ if (!function_exists('smarty_auto_approve_reviews_on_activation')) {
      * Set default option on plugin activation.
      */
     function smarty_auto_approve_reviews_on_activation() {
-        add_option('woocommerce_reviews_auto_approve_rating', 5);
+        add_option('woocommerce_reviews_auto_approve_rating', [5]);
+        if (!wp_next_scheduled('smarty_auto_approve_pending_reviews')) {
+            wp_schedule_event(time(), 'hourly', 'smarty_auto_approve_pending_reviews');
+        }
     }
     register_activation_hook(__FILE__, 'smarty_auto_approve_reviews_on_activation');
+}
+
+if (!function_exists('smarty_auto_approve_reviews_on_deactivation')) {
+    /**
+     * Clear the scheduled event on plugin deactivation.
+     */
+    function smarty_auto_approve_reviews_on_deactivation() {
+        $timestamp = wp_next_scheduled('smarty_auto_approve_pending_reviews');
+        if ($timestamp) {
+            wp_unschedule_event($timestamp, 'smarty_auto_approve_pending_reviews');
+        }
+    }
+    register_deactivation_hook(__FILE__, 'smarty_auto_approve_reviews_on_deactivation');
 }
 
 if (!function_exists('smarty_auto_approve_reviews_init')) {
@@ -111,4 +127,33 @@ if (!function_exists('smarty_auto_approve_reviews_init')) {
         load_plugin_textdomain('smarty-auto-approve-reviews', false, dirname(plugin_basename(__FILE__)) . '/languages');
     }
     add_action('plugins_loaded', 'smarty_auto_approve_reviews_init');
+}
+
+if (!function_exists('smarty_auto_approve_pending_reviews')) {
+    /**
+     * Approve existing pending reviews based on the selected ratings.
+     */
+    function smarty_auto_approve_pending_reviews() {
+        // Get the selected ratings for auto-approval
+        $minRatings = get_option('woocommerce_reviews_auto_approve_rating', [5]);
+
+        // Fetch all pending reviews
+        $args = [
+            'status' => 'hold',
+            'type'   => 'review',
+            'number' => -1,
+        ];
+        $comments = get_comments($args);
+
+        foreach ($comments as $comment) {
+            // Get the rating from the comment meta
+            $rating = get_comment_meta($comment->comment_ID, 'rating', true);
+
+            // Approve the comment if it meets the criteria
+            if (in_array($rating, (array) $minRatings)) {
+                wp_set_comment_status($comment->comment_ID, 'approve', true);
+            }
+        }
+    }
+    add_action('smarty_auto_approve_pending_reviews', 'smarty_auto_approve_pending_reviews');
 }
