@@ -1,0 +1,1 @@
+# smarty-auto-approve-product-reviews
