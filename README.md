@@ -17,6 +17,7 @@
 - Easy to configure through WooCommerce settings.
 - Option to disable auto-approval.
 - Supports WooCommerce's built-in review system.
+- Translation ready.
 
 ## Installation
 
@@ -27,7 +28,7 @@
 
 1. Navigate to WooCommerce settings and click on the 'Products' tab.
 2. Scroll down to the 'Auto Approve Rating' setting.
-3. Select the minimum rating required for automatic approval of reviews.
+3. Select the minimum ratings required for automatic approval of reviews.
 4. Save the settings.
 
 ## Hooks and Customization
@@ -44,6 +45,7 @@
 - `smarty_auto_approve_reviews_action_links`: Adds a settings link in the plugin list.
 - `smarty_auto_approve_reviews_on_activation`: Sets default options on plugin activation.
 - `smarty_auto_approve_reviews_init`: Placeholder for any initialization code.
+- `smarty_auto_approve_reviews_init`: Loads the text domain for translations.
 
 ## Requirements
 

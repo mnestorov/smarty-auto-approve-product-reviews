@@ -33,14 +33,13 @@ if (!function_exists('smarty_auto_approve_reviews_settings')) {
             }
 
             array_splice($settings, $productRatingEnd, 0, [[
-                'title'     => 'Auto approve rating',
-                'desc'      => 'Auto approve reviews with this minimum rating',
+                'title'     => __('Auto approve rating', 'smarty-auto-approve-reviews'),
+                'desc'      => __('Auto approve reviews with these minimum ratings.', 'smarty-auto-approve-reviews'),
                 'id'        => 'woocommerce_reviews_auto_approve_rating',
                 'class'     => 'wc-enhanced-select',
                 'default'   => '5',
-                'type'      => 'select',
+                'type'      => 'multiselect',
                 'options'   => [
-                    '0' => 'Do not automatically approve',
                     '1' => '1',
                     '2' => '2',
                     '3' => '3',
@@ -70,7 +69,7 @@ if (!function_exists('smarty_auto_approve_reviews_check')) {
                     $approved = 1;
                 }
             } else {
-                error_log('Auto Approve Reviews: Rating not set in review submission.');
+                error_log(__('Auto Approve Reviews: Rating not set in review submission.', 'smarty-auto-approve-reviews'));
             }
         }
 
@@ -106,9 +105,8 @@ if (!function_exists('smarty_auto_approve_reviews_init')) {
      * Initialize plugin.
      */
     function smarty_auto_approve_reviews_init() {
-        // Add any initialization code here if needed
-        // For example, loading text domains for translations
-        // load_plugin_textdomain('smarty-auto-approve-reviews', false, dirname(plugin_basename(__FILE__)) . '/languages');
+        // Load plugin textdomain for translations
+        load_plugin_textdomain('smarty-auto-approve-reviews', false, dirname(plugin_basename(__FILE__)) . '/languages');
     }
     add_action('plugins_loaded', 'smarty_auto_approve_reviews_init');
 }
