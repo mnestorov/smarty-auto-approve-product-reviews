@@ -44,7 +44,6 @@
 - `smarty_auto_approve_reviews_check`: Checks and approves reviews based on rating.
 - `smarty_auto_approve_reviews_action_links`: Adds a settings link in the plugin list.
 - `smarty_auto_approve_reviews_on_activation`: Sets default options on plugin activation.
-- `smarty_auto_approve_reviews_init`: Placeholder for any initialization code.
 - `smarty_auto_approve_reviews_init`: Loads the text domain for translations.
 
 ## Requirements
