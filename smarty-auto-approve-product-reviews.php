@@ -9,7 +9,6 @@
  * License:     GPL-2.0+
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain: smarty-auto-approve-reviews
- * Domain Path: /languages
  */
 
 // If this file is called directly, abort.
@@ -39,7 +38,7 @@ if (!function_exists('smarty_auto_approve_reviews_settings')) {
                 'desc'      => __('Auto approve reviews with these minimum ratings.', 'smarty-auto-approve-reviews'),
                 'id'        => 'woocommerce_reviews_auto_approve_rating',
                 'class'     => 'wc-enhanced-select',
-                'default'   => '5',
+                'default'   => [5],
                 'type'      => 'multiselect',
                 'options'   => [
                     '1' => '1',
