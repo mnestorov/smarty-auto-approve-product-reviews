@@ -13,8 +13,8 @@
 
 // If this file is called directly, abort.
 if (!defined('WPINC')) {
-	die;
-} 
+    die;
+}
 
 if (!function_exists('smarty_auto_approve_reviews_settings')) {
     /**
@@ -64,9 +64,9 @@ if (!function_exists('smarty_auto_approve_reviews_check')) {
         if ($commentdata['comment_type'] === 'review' && $approved == 0) {
             if (isset($_POST['rating'])) {
                 $rating = intval($_POST['rating']);
-                $minRating = intval(get_option('woocommerce_reviews_auto_approve_rating', 5));
+                $minRatings = get_option('woocommerce_reviews_auto_approve_rating', [5]);
 
-                if ($rating >= $minRating) {
+                if (in_array($rating, (array) $minRatings)) {
                     $approved = 1;
                 }
             } else {
@@ -84,7 +84,7 @@ if (!function_exists('smarty_auto_approve_reviews_action_links')) {
      * Display a shortcut Settings link on Plugin line.
      */
     function smarty_auto_approve_reviews_action_links($links) {
-        $settings_link = '<a href="' . menu_page_url('wc-settings', false) . '&tab=products">Settings</a>';
+        $settings_link = '<a href="' . menu_page_url('wc-settings', false) . '&tab=products">' . __('Settings', 'smarty-auto-approve-reviews') . '</a>';
         array_unshift($links, $settings_link);
         return $links;
     }
@@ -98,7 +98,7 @@ if (!function_exists('smarty_auto_approve_reviews_on_activation')) {
     function smarty_auto_approve_reviews_on_activation() {
         add_option('woocommerce_reviews_auto_approve_rating', [5]);
         if (!wp_next_scheduled('smarty_auto_approve_pending_reviews')) {
-            wp_schedule_event(time(), 'hourly', 'smarty_auto_approve_pending_reviews');
+            wp_schedule_event(time(), 'every_minute', 'smarty_auto_approve_pending_reviews');
         }
     }
     register_activation_hook(__FILE__, 'smarty_auto_approve_reviews_on_activation');
@@ -128,11 +128,28 @@ if (!function_exists('smarty_auto_approve_reviews_init')) {
     add_action('plugins_loaded', 'smarty_auto_approve_reviews_init');
 }
 
+if (!function_exists('smarty_add_cron_schedules')) {
+    /**
+     * Add custom cron schedules.
+     */
+    function smarty_add_cron_schedules($schedules) {
+        $schedules['every_minute'] = array(
+            'interval' => 60,
+            'display'  => __('Every Minute', 'smarty-auto-approve-reviews'),
+        );
+        return $schedules;
+    }
+    add_filter('cron_schedules', 'smarty_add_cron_schedules');
+}
+
 if (!function_exists('smarty_auto_approve_pending_reviews')) {
     /**
      * Approve existing pending reviews based on the selected ratings.
      */
     function smarty_auto_approve_pending_reviews() {
+        // Add logging for debugging
+        error_log(__('Auto Approve Reviews: Running cron job to approve pending reviews.', 'smarty-auto-approve-reviews'));
+
         // Get the selected ratings for auto-approval
         $minRatings = get_option('woocommerce_reviews_auto_approve_rating', [5]);
 
@@ -151,6 +168,8 @@ if (!function_exists('smarty_auto_approve_pending_reviews')) {
             // Approve the comment if it meets the criteria
             if (in_array($rating, (array) $minRatings)) {
                 wp_set_comment_status($comment->comment_ID, 'approve', true);
+                // Log each approved review
+                error_log(sprintf(__('Auto Approve Reviews: Approved review ID %d with rating %d.', 'smarty-auto-approve-reviews'), $comment->comment_ID, $rating));
             }
         }
     }
