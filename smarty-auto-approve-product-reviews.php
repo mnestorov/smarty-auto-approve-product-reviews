@@ -144,11 +144,11 @@ if (!function_exists('smarty_add_cron_schedules')) {
 
 if (!function_exists('smarty_auto_approve_pending_reviews')) {
     /**
-     * Approve existing pending reviews based on the selected ratings.
+     * Approve existing pending reviews based on the selected ratings and randomize the dates.
      */
     function smarty_auto_approve_pending_reviews() {
         // Add logging for debugging
-        error_log(__('Auto Approve Reviews: Running cron job to approve pending reviews.', 'smarty-auto-approve-reviews'));
+        //error_log(__('Auto Approve Reviews: Running cron job to approve pending reviews.', 'smarty-auto-approve-reviews'));
 
         // Get the selected ratings for auto-approval
         $minRatings = get_option('woocommerce_reviews_auto_approve_rating', [5]);
@@ -161,17 +161,43 @@ if (!function_exists('smarty_auto_approve_pending_reviews')) {
         ];
         $comments = get_comments($args);
 
+        // Array to keep track of used dates
+        $used_dates = [];
+
         foreach ($comments as $comment) {
             // Get the rating from the comment meta
             $rating = get_comment_meta($comment->comment_ID, 'rating', true);
 
             // Approve the comment if it meets the criteria
             if (in_array($rating, (array) $minRatings)) {
+                // Ensure unique dates
+                $random_date = smarty_generate_unique_date($used_dates);
+                wp_update_comment([
+                    'comment_ID' => $comment->comment_ID,
+                    'comment_date' => $random_date,
+                    'comment_date_gmt' => get_gmt_from_date($random_date)
+                ]);
                 wp_set_comment_status($comment->comment_ID, 'approve', true);
                 // Log each approved review
-                error_log(sprintf(__('Auto Approve Reviews: Approved review ID %d with rating %d.', 'smarty-auto-approve-reviews'), $comment->comment_ID, $rating));
+                //error_log(sprintf(__('Auto Approve Reviews: Approved review ID %d with rating %d on %s.', 'smarty-auto-approve-reviews'), $comment->comment_ID, $rating, $random_date));
             }
         }
     }
     add_action('smarty_auto_approve_pending_reviews', 'smarty_auto_approve_pending_reviews');
+}
+
+/**
+ * Generate a unique date that hasn't been used yet.
+ *
+ * @param array $used_dates An array of dates that have already been used.
+ * @return string A unique date string.
+ */
+function smarty_generate_unique_date(&$used_dates) {
+    do {
+        $random_timestamp = rand(strtotime('-30 days'), time());
+        $random_date = date('Y-m-d H:i:s', $random_timestamp);
+    } while (in_array($random_date, $used_dates));
+
+    $used_dates[] = $random_date;
+    return $random_date;
 }
