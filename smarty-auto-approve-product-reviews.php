@@ -9,6 +9,9 @@
  * License:     GPL-2.0+
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain: smarty-auto-approve-reviews
+ * WC requires at least: 3.5.0
+ * WC tested up to: 9.0.2
+ * Requires Plugins: woocommerce
  */
 
 // If this file is called directly, abort.
@@ -62,6 +65,11 @@ if (!function_exists('smarty_auto_approve_reviews_check')) {
      */
     function smarty_auto_approve_reviews_check($approved, $commentdata) {
         if ($commentdata['comment_type'] === 'review' && $approved == 0) {
+            // Check if the review content contains URLs or links
+            if (preg_match('/https?:\/\/[^\s]+/', $commentdata['comment_content'])) {
+                return 'spam';
+            }
+
             if (isset($_POST['rating'])) {
                 $rating = intval($_POST['rating']);
                 $minRatings = get_option('woocommerce_reviews_auto_approve_rating', [5]);
@@ -168,6 +176,12 @@ if (!function_exists('smarty_auto_approve_pending_reviews')) {
             // Get the rating from the comment meta
             $rating = get_comment_meta($comment->comment_ID, 'rating', true);
 
+            // Check if the review content contains URLs or links
+            if (preg_match('/https?:\/\/[^\s]+/', $comment->comment_content)) {
+                wp_spam_comment($comment->comment_ID);
+                continue;
+            }
+
             // Approve the comment if it meets the criteria
             if (in_array($rating, (array) $minRatings)) {
                 // Ensure unique dates
@@ -186,18 +200,20 @@ if (!function_exists('smarty_auto_approve_pending_reviews')) {
     add_action('smarty_auto_approve_pending_reviews', 'smarty_auto_approve_pending_reviews');
 }
 
-/**
- * Generate a unique date that hasn't been used yet.
- *
- * @param array $used_dates An array of dates that have already been used.
- * @return string A unique date string.
- */
-function smarty_generate_unique_date(&$used_dates) {
-    do {
-        $random_timestamp = rand(strtotime('-30 days'), time());
-        $random_date = date('Y-m-d H:i:s', $random_timestamp);
-    } while (in_array($random_date, $used_dates));
+if (!function_exists('smarty_generate_unique_date')) {
+    /**
+     * Generate a unique date that hasn't been used yet.
+     *
+     * @param array $used_dates An array of dates that have already been used.
+     * @return string A unique date string.
+     */
+    function smarty_generate_unique_date(&$used_dates) {
+        do {
+            $random_timestamp = rand(strtotime('-30 days'), time());
+            $random_date = date('Y-m-d H:i:s', $random_timestamp);
+        } while (in_array($random_date, $used_dates));
 
-    $used_dates[] = $random_date;
-    return $random_date;
+        $used_dates[] = $random_date;
+        return $random_date;
+    }
 }
