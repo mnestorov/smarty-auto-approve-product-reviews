@@ -19,23 +19,31 @@ if (!defined('WPINC')) {
     die;
 }
 
+if (!function_exists('smarty_log_error')) {
+    /**
+     * Log error messages to a custom file in the plugin root directory.
+     *
+     * @param string $message The error message to log.
+     */
+    function smarty_log_error($message) {
+        $log_file = plugin_dir_path(__FILE__) . 'smarty-auto-approve-reviews.log';
+        $timestamp = date('Y-m-d H:i:s');
+        error_log("[$timestamp] $message\n", 3, $log_file);
+    }
+}
+
 if (!function_exists('smarty_auto_approve_reviews_settings')) {
     /**
      * Add settings to change auto-approve options.
      */
     function smarty_auto_approve_reviews_settings($settings, $current_section) {
         if (!$current_section || $current_section === 'general') {
-
-            // Basic detection for Reviews section end
             $productRatingEnd = count($settings) - 1;
-
-            // Search the position of Reviews section end in Settings
             foreach ($settings as $index => $setting) {
                 if ($setting['type'] === 'sectionend' && $setting['id'] === 'product_rating_options') {
                     $productRatingEnd = $index;
                 }
             }
-
             array_splice($settings, $productRatingEnd, 0, [[
                 'title'     => __('Auto approve rating', 'smarty-auto-approve-reviews'),
                 'desc'      => __('Auto approve reviews with these minimum ratings.', 'smarty-auto-approve-reviews'),
@@ -53,7 +61,6 @@ if (!function_exists('smarty_auto_approve_reviews_settings')) {
                 'autoload'  => false,
             ]]);
         }
-
         return $settings;
     }
     add_filter('woocommerce_get_settings_products', 'smarty_auto_approve_reviews_settings', 10, 2);
@@ -65,23 +72,22 @@ if (!function_exists('smarty_auto_approve_reviews_check')) {
      */
     function smarty_auto_approve_reviews_check($approved, $commentdata) {
         if ($commentdata['comment_type'] === 'review' && $approved == 0) {
-            // Check if the review content contains URLs or links
-            if (preg_match('/https?:\/\/[^\s]+/', $commentdata['comment_content'])) {
+            // Enhanced check for URLs or links in the review content
+            if (preg_match('/https?:\/\/|www\.|\[url=/', $commentdata['comment_content'])) {
+                smarty_log_error('Review marked as spam due to URL: ' . $commentdata['comment_content']);
                 return 'spam';
             }
-
             if (isset($_POST['rating'])) {
                 $rating = intval($_POST['rating']);
                 $minRatings = get_option('woocommerce_reviews_auto_approve_rating', [5]);
-
                 if (in_array($rating, (array) $minRatings)) {
-                    $approved = 1;
+                    smarty_log_error('Review auto-approved with rating: ' . $rating);
+                    return 1;
                 }
             } else {
-                error_log(__('Auto Approve Reviews: Rating not set in review submission.', 'smarty-auto-approve-reviews'));
+                smarty_log_error('Auto Approve Reviews: Rating not set in review submission.');
             }
         }
-
         return $approved;
     }
     add_filter('pre_comment_approved', 'smarty_auto_approve_reviews_check', 500, 2);
@@ -108,6 +114,7 @@ if (!function_exists('smarty_auto_approve_reviews_on_activation')) {
         if (!wp_next_scheduled('smarty_auto_approve_pending_reviews')) {
             wp_schedule_event(time(), 'every_minute', 'smarty_auto_approve_pending_reviews');
         }
+        smarty_log_error('Auto Approve Reviews: Plugin activated and cron job scheduled.');
     }
     register_activation_hook(__FILE__, 'smarty_auto_approve_reviews_on_activation');
 }
@@ -121,6 +128,7 @@ if (!function_exists('smarty_auto_approve_reviews_on_deactivation')) {
         if ($timestamp) {
             wp_unschedule_event($timestamp, 'smarty_auto_approve_pending_reviews');
         }
+        smarty_log_error('Auto Approve Reviews: Plugin deactivated and cron job unscheduled.');
     }
     register_deactivation_hook(__FILE__, 'smarty_auto_approve_reviews_on_deactivation');
 }
@@ -156,7 +164,7 @@ if (!function_exists('smarty_auto_approve_pending_reviews')) {
      */
     function smarty_auto_approve_pending_reviews() {
         // Add logging for debugging
-        //error_log(__('Auto Approve Reviews: Running cron job to approve pending reviews.', 'smarty-auto-approve-reviews'));
+        smarty_log_error('Auto Approve Reviews: Running cron job to approve pending reviews.');
 
         // Get the selected ratings for auto-approval
         $minRatings = get_option('woocommerce_reviews_auto_approve_rating', [5]);
@@ -173,18 +181,22 @@ if (!function_exists('smarty_auto_approve_pending_reviews')) {
         $used_dates = [];
 
         foreach ($comments as $comment) {
+            // Log review ID
+            smarty_log_error('Processing review ID: ' . $comment->comment_ID);
+
             // Get the rating from the comment meta
             $rating = get_comment_meta($comment->comment_ID, 'rating', true);
+            smarty_log_error('Review ID ' . $comment->comment_ID . ' has rating: ' . $rating);
 
             // Check if the review content contains URLs or links
-            if (preg_match('/https?:\/\/[^\s]+/', $comment->comment_content)) {
+            if (preg_match('/https?:\/\/|www\.|\[url=/', $comment->comment_content)) {
                 wp_spam_comment($comment->comment_ID);
-                continue;
+                smarty_log_error('Review ID ' . $comment->comment_ID . ' marked as spam due to URL.');
+                continue; // Move to the next review
             }
 
             // Approve the comment if it meets the criteria
             if (in_array($rating, (array) $minRatings)) {
-                // Ensure unique dates
                 $random_date = smarty_generate_unique_date($used_dates);
                 wp_update_comment([
                     'comment_ID' => $comment->comment_ID,
@@ -192,9 +204,13 @@ if (!function_exists('smarty_auto_approve_pending_reviews')) {
                     'comment_date_gmt' => get_gmt_from_date($random_date)
                 ]);
                 wp_set_comment_status($comment->comment_ID, 'approve', true);
-                // Log each approved review
-                //error_log(sprintf(__('Auto Approve Reviews: Approved review ID %d with rating %d on %s.', 'smarty-auto-approve-reviews'), $comment->comment_ID, $rating, $random_date));
+                smarty_log_error('Review ID ' . $comment->comment_ID . ' approved with rating ' . $rating);
+            } else {
+                smarty_log_error('Review ID ' . $comment->comment_ID . ' not approved. Rating does not meet criteria.');
             }
+
+            // Ensure we move to the next review
+            continue;
         }
     }
     add_action('smarty_auto_approve_pending_reviews', 'smarty_auto_approve_pending_reviews');
@@ -212,7 +228,6 @@ if (!function_exists('smarty_generate_unique_date')) {
             $random_timestamp = rand(strtotime('-30 days'), time());
             $random_date = date('Y-m-d H:i:s', $random_timestamp);
         } while (in_array($random_date, $used_dates));
-
         $used_dates[] = $random_date;
         return $random_date;
     }
