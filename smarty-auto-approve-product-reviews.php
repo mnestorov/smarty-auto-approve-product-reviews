@@ -73,7 +73,7 @@ if (!function_exists('smarty_auto_approve_reviews_check')) {
     function smarty_auto_approve_reviews_check($approved, $commentdata) {
         if ($commentdata['comment_type'] === 'review' && $approved == 0) {
             // Enhanced check for URLs or links in the review content
-            if (preg_match('/https?:\/\/|www\.|\[url=/', $commentdata['comment_content'])) {
+            if (preg_match('/https?:\/\/|www\.|\[url=|***|https:\/\/|http:\/\/|https:\/\/|http:\/\/www\./', $commentdata['comment_content'])) {
                 smarty_log_error('Review marked as spam due to URL: ' . $commentdata['comment_content']);
                 return 'spam';
             }
@@ -207,10 +207,9 @@ if (!function_exists('smarty_auto_approve_pending_reviews')) {
                 smarty_log_error('Review ID ' . $comment->comment_ID . ' approved with rating ' . $rating);
             } else {
                 smarty_log_error('Review ID ' . $comment->comment_ID . ' not approved. Rating does not meet criteria.');
+                // Move to the next review
+                continue;
             }
-
-            // Ensure we move to the next review
-            continue;
         }
     }
     add_action('smarty_auto_approve_pending_reviews', 'smarty_auto_approve_pending_reviews');
