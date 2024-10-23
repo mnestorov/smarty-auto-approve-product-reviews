@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: SM - Auto Approve Product Reviews for WooCommerce
- * Plugin URI:  https://github.com/smartystudio/smarty-auto-approve-product-reviews
+ * Plugin URI:  https://github.com/mnestorov/smarty-auto-approve-product-reviews
  * Description: Auto approve product reviews with a minimum rating chosen by you.
  * Version:     1.0.0
  * Author:      Smarty Studio | Martin Nestorov
- * Author URI:  https://smartystudio.net
+ * Author URI:  https://github.com/mnestorov
  * License:     GPL-2.0+
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain: smarty-auto-approve-reviews
