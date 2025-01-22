@@ -19,24 +19,50 @@ if (!defined('WPINC')) {
     die;
 }
 
-if (!function_exists('smarty_aar_log_error')) {
+if (!function_exists('smarty_aar_enqueue_admin_scripts')) {
     /**
-     * Log error messages to a custom file in the plugin root directory.
+     * Enqueues admin scripts and styles for the settings page.
      *
-     * @param string $message The error message to log.
+     * This function enqueues the necessary JavaScript and CSS files for the
+     * admin settings pages of the Google Feed Generator plugin.
+     * It also localizes the script to pass AJAX-related data to the JavaScript file.
+     *
+     * @param string $hook_suffix The current admin page hook suffix.
      */
+    function smarty_aar_enqueue_admin_scripts($hook_suffix) {
+        wp_enqueue_script('smarty-aar-admin-js', plugin_dir_url(__FILE__) . 'js/smarty-aar-admin.js', array('jquery'), '1.0.0', true);
+        wp_enqueue_style('smarty-aar-admin-css', plugin_dir_url(__FILE__) . 'css/smarty-aar-admin.css', array(), '1.0.0');
+        wp_localize_script(
+            'smarty-aar-admin-js',
+            'smartyAutoApproveReviews',
+            array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'siteUrl' => site_url(),
+                'nonce'   => wp_create_nonce('smarty_auto_approve_reviews_nonce'),
+            )
+        );
+    }
+    add_action('admin_enqueue_scripts', 'smarty_aar_enqueue_admin_scripts');
+}
+
+if (!function_exists('smarty_aar_log_error')) {
     function smarty_aar_log_error($message) {
+        // Convert all whitespace to single space
+        $message = preg_replace('/\s+/', ' ', $message);
+        // Or just do trim() if you only want to remove leading/trailing spaces
+        // $message = trim($message);
+
         $log_file = plugin_dir_path(__FILE__) . 'debug.log';
         $timestamp = date('Y-m-d H:i:s');
         error_log("[$timestamp] $message\n", 3, $log_file);
     }
 }
 
-if (!function_exists('smarty_aar_settings')) {
+if (!function_exists('smarty_aar_review_settings')) {
     /**
      * Add settings to change auto-approve options in WooCommerce "Products" tab.
      */
-    function smarty_aar_settings($settings, $current_section) {
+    function smarty_aar_review_settings($settings, $current_section) {
         if (!$current_section || $current_section === 'general') {
             $productRatingEnd = count($settings) - 1;
             foreach ($settings as $index => $setting) {
@@ -63,7 +89,7 @@ if (!function_exists('smarty_aar_settings')) {
         }
         return $settings;
     }
-    add_filter('woocommerce_get_settings_products', 'smarty_aar_settings', 10, 2);
+    add_filter('woocommerce_get_settings_products', 'smarty_aar_review_settings', 10, 2);
 }
 
 if (!function_exists('smarty_aar_contains_urls')) {
@@ -285,7 +311,12 @@ if (!function_exists('smarty_aar_pending_reviews')) {
      * Approve existing pending reviews based on the selected ratings and randomize the dates.
      */
     function smarty_aar_pending_reviews() {
-        smarty_aar_log_error('Auto Approve Reviews: Running cron job to approve pending reviews.');
+        $wp_version   = get_bloginfo('version');
+        $php_version  = PHP_VERSION;
+        $memory_usage = size_format(memory_get_usage(true));
+
+        //smarty_aar_log_error("WP: {$wp_version}, PHP: {$php_version}, Mem: {$memory_usage}");
+        smarty_aar_log_error(trim('Running cron job to approve pending reviews.'));
 
         $minRatings = get_option('woocommerce_reviews_aar_rating', [5]);
 
@@ -304,12 +335,12 @@ if (!function_exists('smarty_aar_pending_reviews')) {
 
             // Get the rating from the comment meta
             $rating = get_comment_meta($comment->comment_ID, 'rating', true);
-            smarty_aar_log_error('Review ID ' . $comment->comment_ID . ' has rating: ' . $rating);
+            smarty_aar_log_error(trim('Review ID ' . $comment->comment_ID . ' has rating: ' . $rating));
 
             // If the review content contains a URL, mark as spam
             if (smarty_aar_contains_urls($comment->comment_content)) {
                 wp_spam_comment($comment->comment_ID);
-                smarty_aar_log_error('Review ID ' . $comment->comment_ID . ' marked as spam due to URL.');
+                smarty_aar_log_error(trim('Review ID ' . $comment->comment_ID . ' marked as spam due to URL.'));
                 continue;
             }
 
@@ -322,9 +353,9 @@ if (!function_exists('smarty_aar_pending_reviews')) {
                     'comment_date_gmt' => get_gmt_from_date($random_date)
                 ]);
                 wp_set_comment_status($comment->comment_ID, 'approve', true);
-                smarty_aar_log_error('Review ID ' . $comment->comment_ID . ' approved with rating ' . $rating);
+                smarty_aar_log_error(trim('Review ID ' . $comment->comment_ID . ' approved with rating ' . $rating));
             } else {
-                smarty_aar_log_error('Review ID ' . $comment->comment_ID . ' not approved. Rating does not meet criteria.');
+                smarty_aar_log_error(trim('Review ID ' . $comment->comment_ID . ' not approved. Rating does not meet criteria.'));
             }
         }
     }
@@ -377,14 +408,43 @@ if (!function_exists('smarty_aar_menu')) {
      */
     function smarty_aar_menu() {
         add_options_page(
-            __('Smarty Auto Approve Reviews Settings', 'smarty-auto-approve-reviews'),
+            __('Auto Approve Reviews | Settings', 'smarty-auto-approve-reviews'),
             __('Auto Approve Reviews', 'smarty-auto-approve-reviews'),
             'manage_options',
-            'smarty-auto-approve-reviews',
+            'smarty-aar-settings',
             'smarty_aar_settings_page'
         );
     }
     add_action('admin_menu', 'smarty_aar_menu');
+}
+
+if (!function_exists('smarty_aar_register_settings')) {
+    /**
+     * Register plugin settings.
+     */
+    function smarty_aar_register_settings() {
+        add_settings_section(
+            'smarty_aar_section_general',
+            __('General', 'smarty-auto-approve-reviews'),
+            'smarty_aar_section_general_callback',
+            'smarty-aar-settings'
+        );
+    }
+    add_action('admin_init', 'smarty_aar_register_settings');
+}
+
+if (!function_exists('smarty_aar_section_general_callback')) {
+    /**
+     * Display the description for the general settings section.
+     *
+     * This function outputs the description text for the "General" section
+     * in the plugin's settings page.
+     *
+     * @return void
+     */
+    function smarty_aar_section_general_callback() {
+        echo '<p>' . esc_html__('Below is the plugin debug log. No other settings are currently available.', 'smarty-auto-approve-reviews') . '</p>';
+    }
 }
 
 if (!function_exists('smarty_aar_settings_page')) {
@@ -396,21 +456,210 @@ if (!function_exists('smarty_aar_settings_page')) {
             wp_die(__('You do not have sufficient permissions to access this page.', 'smarty-auto-approve-reviews'));
         }
 
-        echo '<div class="wrap">';
-        echo '<h1>' . __('Smarty Auto Approve Reviews - Debug Log', 'smarty-auto-approve-reviews') . '</h1>';
+        // HTML
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e('Auto Approve Reviews | Settings', 'smarty-auto-approve-reviews'); ?></h1>
+            <div id="smarty-aar-settings-container">
+                <div>
+                    <form action="options.php" method="post">
+                        <?php
+                        settings_fields('smarty-aar-settings');
+                        do_settings_sections('smarty-aar-settings');
+                        ?>
+                    </form>
+        
+                    <?php $log_file = plugin_dir_path(__FILE__) . 'debug.log'; // debug log display ?>
+                    <?php 
+                    if (file_exists($log_file)) { ?>
+                        <?php 
+                        $log_contents = file_get_contents($log_file); 
+                        // Remove unwanted indentation/spaces/blank lines
+                        $log_contents = ltrim($log_contents); 
+                        $log_contents = preg_replace('/^[ \t]+/m', '', $log_contents); 
+                        $log_contents = preg_replace('/^[ \t]*[\r\n]+/m', '', $log_contents);
+                        ?>
+                        <h2><?php esc_html_e('Debug Log', 'smarty-auto-approve-reviews'); ?></h2>
+                        <pre>
+                            <?php echo esc_html($log_contents); ?>
+                        </pre>
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                            <?php wp_nonce_field('smarty_aar_delete_log_nonce'); ?>
+                            <input type="hidden" name="action" value="smarty_aar_delete_log" />
+                            <button type="submit" class="button button-secondary">
+                                <?php esc_html_e('Delete Log', 'smarty-auto-approve-reviews'); ?>
+                            </button>
+                        </form>
+                    <?php } else { ?>
+                        <p class=""><?php esc_html_e('No log file found.', 'smarty-auto-approve-reviews'); ?></p>
+                    <?php } ?>
+                </div>
+                <div id="smarty-aar-tabs-container">
+                    <div>
+                        <h2 class="smarty-aar-nav-tab-wrapper">
+                            <a href="#smarty-aar-documentation" class="smarty-aar-nav-tab smarty-aar-nav-tab-active"><?php esc_html_e('Documentation', 'smarty-auto-approve-reviews'); ?></a>
+                            <a href="#smarty-aar-changelog" class="smarty-aar-nav-tab"><?php esc_html_e('Changelog', 'smarty-auto-approve-reviews'); ?></a>
+                        </h2>
+                        <div id="smarty-aar-documentation" class="smarty-aar-tab-content active">
+                            <div class="smarty-aar-view-more-container">
+                                <p><?php esc_html_e('Click "View More" to load the plugin documentation.', 'smarty-auto-approve-reviews'); ?></p>
+                                <button id="smarty-aar-load-readme-btn" class="button button-primary">
+                                    <?php esc_html_e('View More', 'smarty-auto-approve-reviews'); ?>
+                                </button>
+                            </div>
+                            <div id="smarty-aar-readme-content" style="margin-top: 20px;"></div>
+                        </div>
+                        <div id="smarty-aar-changelog" class="smarty-aar-tab-content">
+                            <div class="smarty-aar-view-more-container">
+                                <p><?php esc_html_e('Click "View More" to load the plugin changelog.', 'smarty-auto-approve-reviews'); ?></p>
+                                <button id="smarty-aar-load-changelog-btn" class="button button-primary">
+                                    <?php esc_html_e('View More', 'smarty-auto-approve-reviews'); ?>
+                                </button>
+                            </div>
+                            <div id="smarty-aar-changelog-content" style="margin-top: 20px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div><?php
+    }
+}
 
-        $log_file = plugin_dir_path(__FILE__) . 'debug.log';
-        if (file_exists($log_file)) {
-            $log_contents = file_get_contents($log_file);
-
-            // Display log in a safe manner
-            echo '<pre style="background: #f9f9f9; border: 1px solid #ccc; padding: 10px;">';
-            echo esc_html($log_contents);
-            echo '</pre>';
-        } else {
-            echo '<p>' . __('No log file found.', 'smarty-auto-approve-reviews') . '</p>';
+if (!function_exists('smarty_aar_delete_log')) {
+    /**
+     * Handles the "Delete Log" form submission from plugin settings.
+     *
+     * - Checks the user capability
+     * - Verifies the nonce
+     * - Deletes the debug.log file if it exists
+     * - Redirects back to the settings page with a success or error message
+     */
+    function smarty_aar_delete_log() {
+        // 1. Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions.', 'smarty-auto-approve-reviews'));
         }
 
-        echo '</div>';
+        // 2. Validate nonce
+        check_admin_referer('smarty_aar_delete_log_nonce');
+
+        // 3. Attempt to delete the file
+        $log_file = plugin_dir_path(__FILE__) . 'debug.log';
+        if (file_exists($log_file)) {
+            $deleted = @unlink($log_file);
+            if ($deleted) {
+                // 4. Redirect with success
+                wp_redirect(
+                    add_query_arg('smarty_aar_deleted', 'true', admin_url('options-general.php?page=smarty-aar-settings'))
+                );
+                exit;
+            } else {
+                // 5. Redirect with error
+                wp_redirect(
+                    add_query_arg('smarty_aar_deleted', 'false', admin_url('options-general.php?page=smarty-aar-settings'))
+                );
+                exit;
+            }
+        } else {
+            // If the file doesn't exist, also consider that "success" or handle differently
+            wp_redirect(
+                add_query_arg('smarty_aar_deleted', 'notfound', admin_url('options-general.php?page=smarty-aar-settings'))
+            );
+            exit;
+        }
     }
+    add_action('admin_post_smarty_aar_delete_log', 'smarty_aar_delete_log');
+}
+
+if (!function_exists('smarty_aar_admin_notices')) {
+    /**
+     * Display an admin notice when the debug.log deletion is successful or fails.
+     */
+    function smarty_aar_admin_notices() {
+        // Only show notices on the settings page "smarty-aar-settings"
+        if (!isset($_GET['page']) || $_GET['page'] !== 'smarty-aar-settings') {
+            return;
+        }
+        
+        if (isset($_GET['smarty_aar_deleted'])) {
+            $status = sanitize_text_field($_GET['smarty_aar_deleted']);
+            
+            if ($status === 'true') {
+                echo '<div class="notice notice-success is-dismissible">';
+                echo '<p>' . esc_html__('Log file deleted successfully.', 'smarty-auto-approve-reviews') . '</p>';
+                echo '</div>';
+            } elseif ($status === 'false') {
+                echo '<div class="notice notice-error is-dismissible">';
+                echo '<p>' . esc_html__('Error: could not delete the log file.', 'smarty-auto-approve-reviews') . '</p>';
+                echo '</div>';
+            } elseif ($status === 'notfound') {
+                echo '<div class="notice notice-warning is-dismissible">';
+                echo '<p>' . esc_html__('Log file not found.', 'smarty-auto-approve-reviews') . '</p>';
+                echo '</div>';
+            }
+        }
+    }
+    add_action('admin_notices', 'smarty_aar_admin_notices');
+}
+
+if (!function_exists('smarty_aar_load_readme')) {
+    /**
+     * AJAX handler to load and parse the README.md content.
+     */
+    function smarty_aar_load_readme() {
+        check_ajax_referer('smarty_auto_approve_reviews_nonce', 'nonce');
+    
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('You do not have sufficient permissions.');
+        }
+    
+        $readme_path = plugin_dir_path(__FILE__) . 'README.md';
+        if (file_exists($readme_path)) {
+            // Include Parsedown library
+            if (!class_exists('Parsedown')) {
+                require_once plugin_dir_path(__FILE__) . 'libs/Parsedown.php';
+            }
+    
+            $parsedown = new Parsedown();
+            $markdown_content = file_get_contents($readme_path);
+            $html_content = $parsedown->text($markdown_content);
+    
+            // Remove <img> tags from the content
+            $html_content = preg_replace('/<img[^>]*>/', '', $html_content);
+    
+            wp_send_json_success($html_content);
+        } else {
+            wp_send_json_error('README.md file not found.');
+        }
+    }    
+    add_action('wp_ajax_smarty_aar_load_readme', 'smarty_aar_load_readme');
+}
+
+if (!function_exists('smarty_aar_load_changelog')) {
+    /**
+     * AJAX handler to load and parse the CHANGELOG.md content.
+     */
+    function smarty_aar_load_changelog() {
+        check_ajax_referer('smarty_auto_approve_reviews_nonce', 'nonce');
+    
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('You do not have sufficient permissions.');
+        }
+    
+        $changelog_path = plugin_dir_path(__FILE__) . 'CHANGELOG.md';
+        if (file_exists($changelog_path)) {
+            if (!class_exists('Parsedown')) {
+                require_once plugin_dir_path(__FILE__) . 'libs/Parsedown.php';
+            }
+    
+            $parsedown = new Parsedown();
+            $markdown_content = file_get_contents($changelog_path);
+            $html_content = $parsedown->text($markdown_content);
+    
+            wp_send_json_success($html_content);
+        } else {
+            wp_send_json_error('CHANGELOG.md file not found.');
+        }
+    }
+    add_action('wp_ajax_smarty_aar_load_changelog', 'smarty_aar_load_changelog');
 }

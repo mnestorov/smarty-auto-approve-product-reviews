@@ -41,7 +41,7 @@
 Below is a breakdown of all major functions used in this plugin and how they contribute to its functionality.
 
 - `smarty_aar_log_error($message)` - Logs messages to the debug.log file in the plugin directory. Useful for debugging and ensuring all actions (spam marking, approvals, etc.) are tracked.
-- `smarty_aar_settings($settings, $current_section)` - Hooks into `woocommerce_get_settings_products` to add a “Auto Approve Rating” multiselect field in WooCommerce’s Products tab.Allows store owners to choose which ratings automatically get approved (e.g., only 5 stars, or 4–5 stars).
+- `smarty_aar_review_settings($settings, $current_section)` - Hooks into `woocommerce_get_settings_products` to add a “Auto Approve Rating” multiselect field in WooCommerce’s Products tab.Allows store owners to choose which ratings automatically get approved (e.g., only 5 stars, or 4–5 stars).
 
 ### Spam-Check Functions
 
