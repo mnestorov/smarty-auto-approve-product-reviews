@@ -19,3 +19,6 @@
 
 - Preserved Original Ratings Logic
     - We still read the rating from $_POST['rating'] and compare it to the user-selected woocommerce_reviews_auto_approve_rating (default [5]).
+
+### 1.0.2 (2025.01.30)
+- Added [HPOS (High-Performance Order Storage)](https://woocommerce.com/document/high-performance-order-storage/) compatibility declaration. The HPOS replaces the old post-based order system with custom database tables. 
